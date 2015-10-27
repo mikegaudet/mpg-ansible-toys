@@ -1,0 +1,93 @@
+---
+# file: mpg-ansible-toys/util-history-grabber.yaml
+
+# Description:
+#   First revision.
+#   Geared towards AWS/EC2
+#   Attempts to read the password file, then grab the history of users
+# with logins.
+#   Useful primarily for trying to reverse-engineer how a server was 
+# set up and/or used.
+
+# Preconditions:
+#   Execution directory is writable
+
+# Examples:
+# ansible-playbook \
+# util-history-grabber.yaml \
+# -i hosts/ec2.py \
+# --user=USERNAME \
+# --private-key=PRIVATE_KEY \
+# --extra-vars "mpg_relative_dest=history_grabs hosts_tag=tag_Name_SERVER-NAME-HERE"
+
+# TODOs:
+#   Check writability of the local directory structure
+#   Name the local fetch destinations sanely instead of automatically
+# (with flat=yes option)
+#   Handle the no stdout lines case
+#   Handle different shells / different history files
+
+# WARNINGS:
+#   THIS IS HACKED TOGETHER AND MAY NOT WORK FOR YOUR USE CASE
+#   EDIT IT YOURSELF
+#   YOU PROBABLY WANT TO MOVE THE DOWNLOADS ELSEWHERE AFTERWARDS
+
+- name: "History Grabber"
+
+  hosts: '{{ hosts_tag }}'
+  vars:
+    mpg_relative_dest: history_grabs
+  tasks:
+
+# ============================================================
+
+# Step 0: Make destination directory
+
+    - name: Create local destination directory
+      local_action:
+        module: file
+        path: "{{ mpg_relative_dest }}"
+        state: "directory"
+
+# ============================================================
+
+# Step 1: grep /etc/passwd for users and homedirs
+# We're assuming everything left will be /bin/bash for now
+# ...but we're doing it this way to eventually catch different shells
+# Just grepping for /bin/bash would be easier
+
+    # - name: DEBUG VERSION Get users with logins NO CUT
+    #   shell:  "cat /etc/passwd | grep -v -E 'nologin|false|:$|/bin/sync$'"
+    #   register: mpg_shell_output
+    #   sudo: True
+
+    - name: Get users with logins
+      shell:  "cat /etc/passwd | grep -v -E 'nologin|false|:$|/bin/sync$' | cut -d ':' -f 6"
+      register: mpg_shell_output
+      sudo: True
+
+    # - name: Debug 1
+    #   debug: var=mpg_shell_output
+
+    # - name: Debug 2
+    #   debug: var=item
+    #   with_items: mpg_shell_output.stdout_lines
+
+# ============================================================
+
+# Step 2: Fetch each history
+
+    - name: Fetch histories for each user
+      fetch: 
+        src="{{ item }}/.bash_history"
+        dest="{{ mpg_relative_dest }}"
+      with_items: mpg_shell_output.stdout_lines
+      sudo: True
+
+    # - name: Example Fetch Ubuntu History
+    #   fetch:
+    #     src=/home/ubuntu/.bash_history
+    #     dest="{{ mpg_relative_dest }}"
+    #   sudo: True
+
+# ============================================================
