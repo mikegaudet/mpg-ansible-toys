@@ -1,0 +1,45 @@
+# file: mpg-ansible-toys/check-ansible-version.yaml
+
+# Description:
+#   Fail out if the version of ansible is not the standard.
+#   Useful if fellow developers either upgrade too often or too little
+#   Add to the start of your top-level playbooks, before hosts: line
+
+# Variables:
+# mpg_standard_ansible_versions 
+#   Defines the exact version strings
+#   we have defined as standard and/or acceptable
+# ansible_version
+#   From (v1/)ansible/utils/__init__.py
+#   https://github.com/ansible/ansible/blob/devel/v1/ansible/utils/__init__.py
+#     return {'string':      ansible_version_string.strip(),
+#             'full':        ansible_version,
+#             'major':       ansible_versions[0],
+#             'minor':       ansible_versions[1],
+#             'revision':    ansible_versions[2]}
+
+
+- name: "check-ansible-version.yaml"
+  hosts: 127.0.0.1
+  connection: local
+  gather_facts: false
+  vars:
+    mpg_standard_ansible_versions: 
+      # - '1.9.1'
+      - '1.9.2' # Current standard
+      - 'x.x.x' # We can add more versions if absolutely necessary
+  tasks:
+
+    # Consider leaving this debug of ansible_version['full'] in place;
+    # Otherwise, it can be a pain to find out the Ansible version on Tower
+
+    - name: Print out full ansible version
+      debug: var=ansible_version['full']
+
+    # - name: Print out our standard ansible versions
+    #   debug: var=mpg_standard_ansible_versions
+
+    - name: Check ansible version versus standards
+      assert: 
+        that:
+          - "ansible_version['full'] in mpg_standard_ansible_versions"
