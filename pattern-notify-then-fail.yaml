@@ -1,0 +1,66 @@
+---
+# file: mpg-ansible-toys/pattern-notify-then-fail.yaml
+
+# Description:
+#   Demo of how to prevent a failed task from stopping the playbook
+# in its tracks -- instead performing a notification, then failing at
+# the conclusion.
+#   Change mpg_success_command to true to see the other pathway.
+
+# Examples:
+
+# ansible-playbook \
+# pattern-notify-then-fail.yaml \
+# -i INVENTORY-DIR/INVENTORY-FILE \
+# --extra-vars "mpg_success_command=false hosts_tag=TARGET-GROUP mpg_hipchat_token=YOUR-TOKEN mpg_hipchat_room=YOUR-ROOM"
+
+# TODOs:
+#   Find a way to randomize exit codes with /bin/sh
+
+# WARNINGS:
+#   This playbook doesn't contain real credentials; import your own
+# to try it out.
+
+- name: "Demonstrating the Notify then Fail Pattern"
+
+  hosts: '{{ hosts_tag }}'
+  vars:
+    mpg_success_command: 'false'
+    mpg_hipchat_from: 'Arturo_Ansible'
+
+  tasks:
+
+    - name: Randomly fail or succeed
+      command: "{{ mpg_success_command }}"
+      ignore_errors: true
+      register: hard_task_result
+      sudo: True
+      tags: hardtask
+
+    - name: Display the result of running the Hard Task
+      debug: var=hard_task_result
+
+  post_tasks:
+    - name: Notify someone of the failure IF we failed
+      hipchat:
+        token={{ mpg_hipchat_token }}
+        room={{ mpg_hipchat_room }}
+        from={{ mpg_hipchat_from }}
+        msg='FAILED attempting to perform a Hard Task'
+        validate_certs=no
+      ignore_errors: yes   # DO NOT FAIL IF HIPCHAT IS DOWN
+      when: hard_task_result|failed
+
+    - name: Notify EVERYONE of the success IF we did not fail
+      hipchat:
+        token={{ mpg_hipchat_token }}
+        room={{ mpg_hipchat_room }}
+        from={{ mpg_hipchat_from }}
+        msg='SUCCEEDED attempting to perform a Hard Task'
+        validate_certs=no
+      ignore_errors: yes   # DO NOT FAIL IF HIPCHAT IS DOWN
+      when: hard_task_result|success
+
+    - name: Finally fail the playbook if there was a failure
+      debug: msg="Fail out if needed"
+      failed_when: hard_task_result|failed
