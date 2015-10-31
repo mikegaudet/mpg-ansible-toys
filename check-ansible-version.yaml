@@ -27,6 +27,7 @@
     mpg_standard_ansible_versions: 
       # - '1.9.1'
       - '1.9.2' # Current standard
+      - '1.9.4' # Prospective new standard
       - 'x.x.x' # We can add more versions if absolutely necessary
   tasks:
 
